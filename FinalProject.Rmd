@@ -1,0 +1,431 @@
+---
+title: "junk"
+output: html_document
+date: "2023-06-17"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+---
+title: "Project proposal"
+author: "Team name : Team 19, Mickael Zeitoun, Yael Berkovich and Nitzan Ofer"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+```{r}
+# install.packages("knitr")
+# install.packages("tidyverse")
+# install.packages("tidymodels")
+# install.packages("recipes")
+# install.packages("broom")
+# install.packages("htmltools")
+# install.packages("readxl")
+# install.packages("dplyr")
+# install.packages("lubridate")
+# install.packages("openintro")
+# install.packages("ROSE")
+# install.packages("caret")
+# install.packages("broom")
+# install.packages("MASS")
+
+```
+
+
+
+### Libraries:
+
+```{r load-packages, message = FALSE, warning=FALSE, echo=FALSE}
+library(knitr)
+library(tidyverse)
+library(tidymodels)
+library(recipes)
+# library(workflows)
+library(broom)
+library(htmltools)
+library(readxl)
+library(dplyr)
+library(lubridate)
+library(openintro)
+library(ROSE)
+library(caret)
+library(broom)
+library(MASS)
+library(schrute)
+
+```
+
+
+### Loading Data
+Save the data in your computer and copy the file path here(replace the slashes nto double slac:
+
+```{r, warning=FALSE}
+vr_data <- read_excel('C:\\Users\\Mickael\\OneDrive - post.bgu.ac.il\\Data engineering\\Year 2\\Semester 4\\advancing programming\\project\\VR.xlsx', skip = 1)
+vr_data
+```
+
+
+### Changing names for data
+
+```{r}
+colnames(vr_data)[5] <- "Monitor_scenario_score"
+colnames(vr_data)[7] <- "What_did_the_trauma_victim_suffer_from"
+colnames(vr_data)[8] <- "What_are_the_symptoms_that_helped_you_diagnose_the_injured"
+colnames(vr_data)[9] <- "What_is_the_needed_treatment_immediatly_after_placing_a_tourniquet"
+colnames(vr_data)[10] <- "What_signs_and_symptoms_helped_you_determine_if_the_treatment_was_successful"
+colnames(vr_data)[11] <- "Where_is_the_equipment_used_to_treat_an_amputation_in_the_ambulance"
+colnames(vr_data)[13] <- "Monitor_confidence"
+
+column <- vr_data$What_signs_and_symptoms_helped_you_determine_if_the_treatment_was_successful
+column[1] <- column[2]
+column[2] <- 2
+vr_data$What_signs_and_symptoms_helped_you_determine_if_the_treatment_was_successful <- column
+colnames(vr_data)[18] <- "can_the_simulator_improve_your_ability_to_treat_similar_cases"
+
+```
+
+
+# Last columns of the dataset are nulls so we get rid of them
+
+```{r}
+vr_data <- vr_data[1:(nrow(vr_data)-3), ]
+```
+
+
+
+
+
+
+# Changing the incorrect values from 2 to -1 so there is a scale in the scoring
+
+```{r}
+
+vr_data$What_did_the_trauma_victim_suffer_from[vr_data$What_did_the_trauma_victim_suffer_from == 2] <- -1
+
+
+vr_data$Where_is_the_equipment_used_to_treat_an_amputation_in_the_ambulance[vr_data$Where_is_the_equipment_used_to_treat_an_amputation_in_the_ambulance == 2] <- -1
+
+vr_data$Where_is_the_equipment_used_to_treat_an_amputation_in_the_ambulance[vr_data$Where_is_the_equipment_used_to_treat_an_amputation_in_the_ambulance == "לא ביצעתי את התרחיש"] <- 0
+
+vr_data$What_is_the_needed_treatment_immediatly_after_placing_a_tourniquet <- ifelse(vr_data$What_is_the_needed_treatment_immediatly_after_placing_a_tourniquet == 2, -1, vr_data$What_is_the_needed_treatment_immediatly_after_placing_a_tourniquet)
+
+vr_data
+```
+
+
+
+
+
+# Selecting specific columns by their names
+
+
+```{r}
+selected_columns <- vr_data[c(
+  "What_did_the_trauma_victim_suffer_from",
+  "What_are_the_symptoms_that_helped_you_diagnose_the_injured",
+  "What_is_the_needed_treatment_immediatly_after_placing_a_tourniquet",
+  "What_signs_and_symptoms_helped_you_determine_if_the_treatment_was_successful",
+  "Where_is_the_equipment_used_to_treat_an_amputation_in_the_ambulance",
+  "can_the_simulator_improve_your_ability_to_treat_similar_cases"
+  
+)]
+evaluation_dataset <- as.data.frame(selected_columns)
+
+evaluation_dataset$What_signs_and_symptoms_helped_you_determine_if_the_treatment_was_successful <- as.numeric(evaluation_dataset$What_signs_and_symptoms_helped_you_determine_if_the_treatment_was_successful)
+evaluation_dataset$Where_is_the_equipment_used_to_treat_an_amputation_in_the_ambulance <- as.numeric(evaluation_dataset$Where_is_the_equipment_used_to_treat_an_amputation_in_the_ambulance)
+```
+
+
+
+# Creating linear model
+```{r model}
+
+vr_linear_model <- linear_reg() %>%
+  set_engine("lm")
+  
+
+```
+
+
+# Creating a recipe
+```{r recipe}
+vr_rec <- recipe(can_the_simulator_improve_your_ability_to_treat_similar_cases ~ ., data = evaluation_dataset) %>%
+  step_zv(all_predictors() )%>%
+  step_normalize(all_numeric(), -all_outcomes())
+
+vr_rec
+```
+
+
+# Creating a workflow
+```{r workflow}
+vr_wflow <- workflow() %>%
+  add_model(vr_linear_model) %>%
+  add_recipe(vr_rec)
+```
+
+
+
+```{r fit}
+
+vr_fit <- vr_wflow %>%
+  fit(data = evaluation_dataset)
+
+lm_summary <- tidy(vr_fit)
+
+lm_summary
+
+```
+
+# R-squared
+
+
+```{r}
+
+glance(vr_fit)$adj.r.squared
+glance(vr_fit)$r.squared
+
+```
+
+### We can see that we got a poor r-squared
+
+
+# Checking correlation between people that did well and confidence and check people that did poorly and confidence
+
+
+
+```{r}
+
+
+colnames(vr_data)[35] <- "weighted_trauma_score"
+
+
+vr_data <- vr_data %>%
+  mutate(weighted_trauma_score = ifelse(is.na(weighted_trauma_score), median(weighted_trauma_score, na.rm = TRUE), weighted_trauma_score))
+
+
+vr_data
+
+```
+
+
+
+# Creating a random forest multi-class classification model
+
+
+```{r}
+# Load required library
+library(randomForest)
+library(caret)
+
+# Set the seed for reproducibility
+set.seed(124)
+
+# Convert the response variable to a factor
+evaluation_dataset$can_the_simulator_improve_your_ability_to_treat_similar_cases <- as.factor(evaluation_dataset$can_the_simulator_improve_your_ability_to_treat_similar_cases)
+
+
+# Split the data into training and testing sets
+train_indices <- createDataPartition(evaluation_dataset$can_the_simulator_improve_your_ability_to_treat_similar_cases, p = 0.7, list = FALSE)
+train_data <- evaluation_dataset[train_indices, ]
+test_data <- evaluation_dataset[-train_indices, ]
+
+model <- train(can_the_simulator_improve_your_ability_to_treat_similar_cases ~ ., data = train_data, method = "rf")
+
+importance <- model$finalModel$importance
+print(importance)
+
+predicted_class <- predict(model, newdata = test_data)
+
+comparison <- data.frame(Actual = test_data$can_the_simulator_improve_your_ability_to_treat_similar_cases, Predicted = predicted_class)
+
+# Calculate accuracy
+accuracy <- mean(comparison$Actual == comparison$Predicted)
+print(paste("Accuracy:", accuracy))
+
+class_metrics <- confusionMatrix(comparison$Predicted, comparison$Actual)
+
+support <- table(comparison$Actual)
+print(support)
+precision <- class_metrics$byClass[, "Precision"]
+recall <- class_metrics$byClass[, "Recall"]
+
+precision[precision == 0] <- 0.000000000001
+recall[recall == 0] <- 0.0000000001
+
+f1_score <- 2 * (precision * recall) / (precision + recall)
+
+
+weighted_precision <- sum(precision * support) / sum(support)
+weighted_recall <- sum(recall * support) / sum(support)
+weighted_f1_score <- sum(f1_score * support) / sum(support)
+print(paste("Precision:", weighted_precision))
+print(paste("Recall:", weighted_recall))
+print(paste("F1-score:", weighted_f1_score))
+evaluation_dataset
+
+```
+
+# We got an okay f1-score in the random forest. Now we'll explore logistic regression model on the y column that we transform 
+into 2 binary bins outcome of 0 and 1.
+
+
+
+
+```{r}
+evaluation_dataset$can_the_simulator_improve_your_ability_to_treat_similar_cases <- na.omit(evaluation_dataset$can_the_simulator_improve_your_ability_to_treat_similar_cases)
+evaluation_dataset
+```
+
+```{r}
+selected_columns <- vr_data[c(
+  "What_did_the_trauma_victim_suffer_from",
+  "What_are_the_symptoms_that_helped_you_diagnose_the_injured",
+  "What_is_the_needed_treatment_immediatly_after_placing_a_tourniquet",
+  "What_signs_and_symptoms_helped_you_determine_if_the_treatment_was_successful",
+  "Where_is_the_equipment_used_to_treat_an_amputation_in_the_ambulance",
+  "can_the_simulator_improve_your_ability_to_treat_similar_cases"
+
+)]
+evaluation_dataset <- as.data.frame(selected_columns)
+
+evaluation_dataset$What_signs_and_symptoms_helped_you_determine_if_the_treatment_was_successful <- as.numeric(evaluation_dataset$What_signs_and_symptoms_helped_you_determine_if_the_treatment_was_successful)
+evaluation_dataset$Where_is_the_equipment_used_to_treat_an_amputation_in_the_ambulance <- as.numeric(evaluation_dataset$Where_is_the_equipment_used_to_treat_an_amputation_in_the_ambulance)
+```
+
+
+
+```{r}
+
+
+evaluation_dataset$Where_is_the_equipment_used_to_treat_an_amputation_in_the_ambulance[evaluation_dataset$Where_is_the_equipment_used_to_treat_an_amputation_in_the_ambulance == 2] <- -1
+
+evaluation_dataset$can_the_simulator_improve_your_ability_to_treat_similar_cases[evaluation_dataset$can_the_simulator_improve_your_ability_to_treat_similar_cases == 2] <- 0
+
+evaluation_dataset$can_the_simulator_improve_your_ability_to_treat_similar_cases[evaluation_dataset$can_the_simulator_improve_your_ability_to_treat_similar_cases == 3] <- 0
+
+evaluation_dataset$can_the_simulator_improve_your_ability_to_treat_similar_cases <- factor(evaluation_dataset$can_the_simulator_improve_your_ability_to_treat_similar_cases, levels = c(0,1))
+evaluation_dataset
+```
+
+
+
+## Splitting the data
+
+```{r}
+set.seed(124)
+
+evaluation_dataset_df_split <- initial_split(evaluation_dataset, prop = 0.7, strata ="can_the_simulator_improve_your_ability_to_treat_similar_cases")
+train_data <- training(evaluation_dataset_df_split)
+test_data <- testing(evaluation_dataset_df_split)
+```
+
+# Factoring the y variable in the train and test data
+
+```{r}
+train_data$can_the_simulator_improve_your_ability_to_treat_similar_cases <- as.factor(train_data$can_the_simulator_improve_your_ability_to_treat_similar_cases)
+
+test_data$can_the_simulator_improve_your_ability_to_treat_similar_cases <- as.factor(test_data$can_the_simulator_improve_your_ability_to_treat_similar_cases)
+```
+
+
+
+# Creating a recipe
+
+```{r recipe}
+
+
+vr_logistic_rec <- recipe(can_the_simulator_improve_your_ability_to_treat_similar_cases ~ .,data = train_data) %>%
+  step_dummy(all_nominal(), -all_outcomes()) %>%
+  step_normalize(all_numeric(), -all_outcomes())  
+summary(vr_logistic_rec)
+```
+
+
+
+
+#Creating a workflow
+
+```{r workflow}
+vr_logistic_wflow <- workflow() %>%
+  add_recipe(vr_logistic_rec) %>%
+  add_model(logistic_reg()) 
+ 
+
+vr_logistic_wflow
+```
+
+
+
+# Fitting the workflow with the trained data
+
+```{r fit}
+
+vr_logistic_fit <- vr_logistic_wflow %>%
+  fit(data = train_data)
+
+vr_logistic_fit
+
+```
+
+# Creating a prediction dataset based on the probabilty there is a 1 in the y variable of the test_data
+
+```{r}
+
+vr_pred <- predict(vr_logistic_fit, test_data, type = "prob") %>% 
+  bind_cols(test_data)
+
+cutoff_prob <- 0.7
+
+vr_pred <- mutate(vr_pred, can_the_simulator_improve_your_ability_to_treat_similar_cases_pred = if_else(.pred_1 > cutoff_prob, 1, 0))
+
+vr_pred
+```
+
+
+### Getting the f1-score recall and precision
+
+```{r}
+library(schrute)
+library(caret)
+
+
+
+vr_pred$can_the_simulator_improve_your_ability_to_treat_similar_cases_pred <- as.factor(vr_pred$can_the_simulator_improve_your_ability_to_treat_similar_cases_pred)
+
+conf_mat <- confusionMatrix(table(vr_pred$can_the_simulator_improve_your_ability_to_treat_similar_cases, vr_pred$can_the_simulator_improve_your_ability_to_treat_similar_cases_pred), positive = "1")
+
+precision <- conf_mat$byClass['Precision']
+recall <- conf_mat$byClass['Recall']
+f1_score <- conf_mat$byClass['F1']
+
+precision
+recall
+f1_score
+
+
+```
+
+
+
+```{r}
+
+tidy(vr_logistic_fit)
+
+```
+
+
+
