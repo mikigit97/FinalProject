@@ -26,26 +26,6 @@ editor_options:
     wrap: sentence
 ---
 
-```{r}
-# install.packages("knitr")
-# install.packages("tidyverse")
-# install.packages("tidymodels")
-# install.packages("recipes")
-# install.packages("broom")
-# install.packages("htmltools")
-# install.packages("readxl")
-# install.packages("dplyr")
-# install.packages("lubridate")
-# install.packages("openintro")
-# install.packages("ROSE")
-# install.packages("caret")
-# install.packages("broom")
-# install.packages("MASS")
-
-```
-
-
-
 ### Libraries:
 
 ```{r load-packages, message = FALSE, warning=FALSE, echo=FALSE}
